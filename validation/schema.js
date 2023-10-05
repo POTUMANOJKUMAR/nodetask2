@@ -7,8 +7,13 @@ const products = Joi.object({
   
  
   const schema = Joi.object({
-    c_id: Joi.number().integer().min(1).required(),
+    
+    cust_id: Joi.number().integer().min(1).required(),
     products: Joi.array().items(products).min(1).required(),
   });
+  const schema1=Joi.object({
+    orderId:Joi.number().integer().min(1).required(),
+    items: Joi.array().items(products).min(1).required(),
+  })
 
-module.exports=schema
+module.exports={schema,schema1}

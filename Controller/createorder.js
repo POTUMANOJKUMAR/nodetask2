@@ -1,73 +1,55 @@
 const database = require("../database/db");
 
 const createorder = async (req, res) => {
-    const c_id = req.body.c_id;
-    const query = `SELECT name FROM customers WHERE c_id = ?;`;
-    database.query(query, [c_id], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).send({ message: "server error", });
-        }
-        if (result.length === 0) {
-            return res.status(404).send("Customer not found");
-        }
+  const { cust_id, products } = req.body;
 
-        const products = req.body.products;
-        const productIds = products.map((product) => product.product_id);
-        const quantities = products.map((product) => product.quantity);
-        const query1 = `SELECT product_id, product_name, quantity FROM products WHERE product_id IN (${productIds.join(',')})`;
+  try {
+  
+    const [customerResult] = await database.query('SELECT customer_name FROM customers WHERE customer_id = ?', [cust_id]);
 
-        database.query(query1, [productIds], (err, productResults) => {
-          
-            if (err) {
-                console.error(err);
-                return res.status(500).send({ message: "Server error", err });
-            }
+    if (customerResult.length === 0) {
+      return res.status(404).send("Customer not found");
+    }
 
-            const lessQuantity = productResults.filter((item, index) => item.quantity < quantities[index]);
-         console.log(lessQuantity)  
-          if (lessQuantity.length > 0) {
-                return res.status(400).send({ message: "Insufficient quantity for some products", products: lessQuantity });
-            }
+    const productIds = products.map((product) => product.product_id);
+    const quantities = products.reduce((map, product) => {
+      map[product.product_id] = product.quantity;
+      return map;
+    }, {});
 
-            const query2 = `INSERT INTO CREATEORDER(c_id, product_id, product_name, quantity) VALUES ?`;
-            const values = productResults.map((item, index) => [c_id, productIds[index], item.product_name, quantities[index]]);
-            database.query(query2, [values], (err, insertResult) => {
-                if (err) {
-                    console.error(err);
-                    return res.status(500).send({ message: "Server error", err });
-                }
+   
+    const [productResults] = await database.query('SELECT product_id, product_name, product_quantity FROM productinfo WHERE product_id IN (?)', [productIds]);
 
-               
-                const update = productResults.map((item, index) => ({
-                    quantity: quantities[index],
-                    product_id: item.product_id,
-                }));
+    if (productResults.length !== productIds.length) {
+      return res.status(400).send({ message: "Some products not found in the database" });
+    }
 
-               
-                const updateQuery = `UPDATE products AS p
-                SET p.quantity = p.quantity - ?
-                WHERE p.product_id = ?`;
+    const lessQuantity = productResults.filter((item) => item.product_quantity < quantities[item.product_id]);
 
+    if (lessQuantity.length > 0) {
+      return res.status(400).send({ message: "Insufficient quantity for some products", products: lessQuantity });
+    }
 
-                const updateValuesArray = update.reduce((acc, val) => {
-                    acc.push(val.quantity);
-                    acc.push(val.product_id);
-                    return acc;
-                }, []);
-                
+  
+    const [orderResult] = await database.query('INSERT INTO orderinfo (cust_id) VALUES (?)', [cust_id]);
+    const order_id = orderResult.insertId;
 
-                database.query(updateQuery, updateValuesArray, (err, updateResult) => {console.log(updateResult)
-                    if (err) {
-                        console.error(err);
-                        return res.status(500).send({ message: "Server error", err });
-                    }
+    const values = productResults.map((item) => [order_id, cust_id, item.product_id, quantities[item.product_id]]);
 
-                    res.send({ message: "Order created successfully, products table updated" });
-                });
-            });
-        });
-    });
+    
+    await database.query('INSERT INTO createorder (ord_id, cust_id, prod_id, prod_quantity) VALUES ?', [values]);
+
+   
+    const updateQuery = `UPDATE productinfo SET product_quantity = CASE ${productResults.map((item) => `WHEN ${item.product_id} THEN product_quantity - ${quantities[item.product_id]}`).join(' ')} END WHERE product_id IN (${productIds.join(',')})`;
+
+    await database.query(updateQuery);
+    
+
+    res.send({ message: "Order created successfully, products table updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Server error", err });
+  }
 };
 
 module.exports = { createorder };

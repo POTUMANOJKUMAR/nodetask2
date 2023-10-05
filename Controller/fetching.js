@@ -1,21 +1,25 @@
-
 const database = require("../database/db");
 
+const fetching = async (req, res) => {
+    try {
+        const c_id = req.body.c_id;
 
+        const [results] = await database.query(
+            `SELECT  createorder.prod_quantity, productinfo.product_alternate_name, productinfo.product_description
+            FROM createorder
+            JOIN productinfo ON createorder.prod_id = productinfo.product_id
+            WHERE createorder.cust_id = ?`,
+            [c_id]
+        );
 
-const fetching=async(req,res)=>{
-    const c_id=req.body.c_id
-  
-    const query=`select createorder.product_name,createorder.quantity,products.alternate_name ,products.product_description from products join createorder  on createorder.product_id=products.product_id where createorder.c_id=?` 
-    database.query(query,[c_id],(err,result)=>{
-        if(err)console.error(err)
-        if(!result[0]){
-            return res.send("no customer")
-        }else
-         return res.send(result)
-    })
-}
+        
+        res.json(results);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
-module.exports={
+module.exports = {
     fetching
-}
+};
