@@ -1,7 +1,7 @@
 const nodemailer=require("nodemailer")
 
-  async function sendmail(){
-const transporter = nodemailer.createTransport({
+ function sendmail(){
+const transporter =  nodemailer.createTransport({
     service: 'gmail', 
     auth: {
       user: process.env.user,
@@ -11,10 +11,12 @@ const transporter = nodemailer.createTransport({
   
  
   const mailOptions = {
+    
     from: process.env.user,
     to: process.env.to,
     subject: 'Total orders info',
     text: 'This is  All order detailes',
+    
     attachments: [
       {
         filename: 'output.xlsx',
@@ -24,7 +26,7 @@ const transporter = nodemailer.createTransport({
   };
   
  
-  await transporter.sendMail(mailOptions, (error, info) => {
+ transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       console.error('Error sending email:', error);
     } else {
